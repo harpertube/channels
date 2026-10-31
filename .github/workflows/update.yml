@@ -1,0 +1,63 @@
+name: Update video data
+
+on:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+defaults:
+  run:
+    # Unlike the implicit default shell, an explicit "bash" adds -o pipefail, so
+    # "build_data.py | tee" fails when build_data.py does.
+    shell: bash
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Update data
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: python3 build_data.py data | tee build.log
+
+      - name: Commit changes
+        id: commit
+        run: |
+          git add -A data
+          if git diff --cached --quiet; then
+            echo "No changes."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "Update video data" -m "$(grep -v '(0 new)' build.log || true)"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # Scheduled runs only deploy when the data changed. Pushes and manual runs
+      # always deploy, which also recovers from a run that committed but failed to deploy.
+      - if: steps.commit.outputs.changed == 'true' || github.event_name != 'schedule'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: data/
+
+      - if: steps.commit.outputs.changed == 'true' || github.event_name != 'schedule'
+        id: deployment
+        uses: actions/deploy-pages@v5
