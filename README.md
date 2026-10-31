@@ -14,6 +14,7 @@ The `data` branch is a history of the published data, one commit per change. It 
 2. Runs `build_data.py`, which only asks YouTube about uploads not already in that data.
    - It checks each channel's free RSS feed first. A channel with no new uploads costs no API quota.
    - A new channel gets its whole upload history backfilled.
+   - YouTube Shorts and videos that can't be embedded are left out.
 3. Deploys the result to GitHub Pages and commits it to the `data` branch. A scheduled run skips both when nothing changed.
 
 ## Setup
