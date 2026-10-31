@@ -6,8 +6,14 @@ on:
   schedule:
     - cron: "23 * * * *"
   workflow_dispatch:
+    inputs:
+      fresh:
+        description: "Rebuild all video data from scratch instead of extending the published data (needed if nothing is published yet)"
+        type: boolean
+        default: false
 
 permissions:
+  # To push to the data branch.
   contents: write
   pages: write
   id-token: write
@@ -31,33 +37,64 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - id: pages
+        uses: actions/configure-pages@v6
+
       - name: Update data
+        id: build
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: python3 build_data.py data | tee build.log
-
-      - name: Commit changes
-        id: commit
+          FRESH: ${{ inputs.fresh }}
+          PREVIOUS_URL: ${{ steps.pages.outputs.base_url }}/
         run: |
-          git add -A data
-          if git diff --cached --quiet; then
-            echo "No changes."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          if [ "$FRESH" = "true" ]; then
+            python3 build_data.py _site --fresh | tee "$RUNNER_TEMP/build.log"
+          else
+            python3 build_data.py _site --previous "$PREVIOUS_URL" | tee "$RUNNER_TEMP/build.log"
           fi
-          git -c user.name="github-actions[bot]" \
-              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -m "Update video data" -m "$(grep -v '(0 new)' build.log || true)"
-          git push
-          echo "changed=true" >> "$GITHUB_OUTPUT"
 
       # Scheduled runs only deploy when the data changed. Pushes and manual runs
-      # always deploy, which also recovers from a run that committed but failed to deploy.
-      - if: steps.commit.outputs.changed == 'true' || github.event_name != 'schedule'
+      # always deploy, which also recovers from a run whose deploy failed.
+      - if: steps.build.outputs.changed == 'true' || github.event_name != 'schedule'
         uses: actions/upload-pages-artifact@v5
         with:
-          path: data/
+          path: _site/
 
-      - if: steps.commit.outputs.changed == 'true' || github.event_name != 'schedule'
+      - if: steps.build.outputs.changed == 'true' || github.event_name != 'schedule'
         id: deployment
         uses: actions/deploy-pages@v5
+
+      # Keeps a history of the published data on the "data" branch, which shares
+      # no history with master. It holds only the published files, one commit per
+      # change, so data commits never clutter master's history. The pushes also
+      # count as repository activity, which keeps GitHub from disabling this
+      # scheduled workflow after 60 days without any.
+      - name: Record data history
+        if: steps.build.outputs.changed == 'true' || github.event_name != 'schedule'
+        working-directory: _site
+        env:
+          REMOTE: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+        run: |
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "$REMOTE"
+          # ls-remote exits with 2 when the branch doesn't exist yet (the first run);
+          # any other failure stops the run.
+          status=0
+          git ls-remote --exit-code --heads origin data > /dev/null || status=$?
+          if [ "$status" -eq 0 ]; then
+            # Put HEAD at the previous data commit without touching the new files,
+            # so the next commit records exactly what changed, deletions included.
+            git fetch -q --depth=1 origin data
+            git reset -q --soft FETCH_HEAD
+          elif [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Data branch already has these files."
+            exit 0
+          fi
+          git commit -q -m "Update video data" -m "$(grep -v '(0 new)' "$RUNNER_TEMP/build.log" || true)"
+          git push -q origin HEAD:data

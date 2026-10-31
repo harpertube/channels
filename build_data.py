@@ -1,8 +1,10 @@
-"""Updates the video data directory for the channels in channels.json.
+"""Builds the video data directory for the channels in channels.json.
 
-Usage: YOUTUBE_API_KEY=... python build_data.py DATA_DIR
+Usage:
+  YOUTUBE_API_KEY=... python build_data.py OUT_DIR --previous URL
+  YOUTUBE_API_KEY=... python build_data.py OUT_DIR --fresh
 
-Layout of DATA_DIR:
+Layout of OUT_DIR:
   index.json                       {"version", "channels": {handle: {"name", "manifest", "count"}}}
   <Handle>/manifest.<hash>.json    {"uploads": playlist ID, "skipped": [IDs of videos that can't be embedded],
                                     "batches": [batch file names, oldest first]}
@@ -16,19 +18,22 @@ until it holds BATCH_SIZE videos, then a new batch starts. Full batches are
 never rewritten, even if one of their videos is later deleted, so a client
 never downloads them twice.
 
-DATA_DIR is both the input and the output. Its current contents are extended
-with any uploads not seen before, and files that are no longer referenced are
-deleted. A channel not in DATA_DIR yet (including on the very first run) gets
-its whole upload history backfilled, which costs about 2 API quota units per 50
-videos. A channel removed from channels.json is deleted from DATA_DIR.
+The previously published data (--previous, the base URL of the deployed site)
+is this script's memory: it's downloaded, extended with any uploads not seen
+before, and written to OUT_DIR in full. A channel not in the previous data
+(or every channel, with --fresh) gets its whole upload history backfilled,
+which costs about 2 API quota units per 50 videos. A channel removed from
+channels.json is left out.
 
 Keeping a channel up to date is nearly free: its RSS feed (no quota) is checked
 first, and the API is only called when the feed shows a video not seen before
 or the feed can't be downloaded. Then it costs 1 unit per 50 playlist entries
 paged through, plus 1 unit per 50 new videos looked up.
 
-If nothing changed, nothing in DATA_DIR is touched.
+When run in GitHub Actions, it sets the step output "changed" to "true" or
+"false", depending on whether the result differs from the previous data.
 """
+import argparse
 import hashlib
 import json
 import os
@@ -38,6 +43,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -111,11 +117,33 @@ def hashed_name(stem, data):
     return f"{stem}.{hashlib.sha256(data).hexdigest()[:12]}.json"
 
 
-def read_json(path):
+def download(url):
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        fail(f"{path} is missing; the data directory is inconsistent")
+        with urllib.request.urlopen(url, timeout=60) as res:
+            return res.read()
+    except urllib.error.HTTPError as e:
+        fail(f"downloading {url} failed: HTTP {e.code}")
+    except urllib.error.URLError as e:
+        fail(f"downloading {url} failed: {e.reason}")
+
+
+def load_previous_index(base_url):
+    """Returns (index, its raw bytes) of the previously published data."""
+    url = base_url + "index.json"
+    try:
+        with urllib.request.urlopen(url, timeout=60) as res:
+            raw = res.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            fail(f"no previous data at {url}. If nothing has been published yet, use --fresh "
+                 "(in GitHub, run the workflow by hand with 'fresh' checked).")
+        fail(f"downloading {url} failed: HTTP {e.code}")
+    except urllib.error.URLError as e:
+        fail(f"downloading {url} failed: {e.reason}")
+    index = json.loads(raw)
+    if index.get("version") != FORMAT_VERSION:
+        fail(f"{url} is format version {index.get('version')}, expected {FORMAT_VERSION}. Rebuild with --fresh.")
+    return index, raw
 
 
 def resolve_uploads(key, handle):
@@ -169,13 +197,15 @@ def fetch_new_videos(key, uploads, known):
     return [videos[i] for i in reversed(new_ids) if i in videos], not_embeddable
 
 
-def update_channel(key, data_dir, handle, existing_entry):
+def update_channel(key, previous_base, handle, previous_entry):
     """Returns (manifest without its batch names, batches, number of videos added)."""
-    if existing_entry:
-        manifest = read_json(data_dir / existing_entry["manifest"])
+    if previous_entry:
+        manifest = json.loads(download(previous_base + previous_entry["manifest"]))
         uploads = manifest["uploads"]
         skipped = manifest["skipped"]
-        batches = [read_json(data_dir / channel_dir(handle) / name) for name in manifest["batches"]]
+        dir_url = previous_base + channel_dir(handle) + "/"
+        with ThreadPoolExecutor(16) as pool:
+            batches = [json.loads(b) for b in pool.map(lambda name: download(dir_url + name), manifest["batches"])]
     else:
         uploads = resolve_uploads(key, handle)
         skipped = []
@@ -191,35 +221,25 @@ def update_channel(key, data_dir, handle, existing_entry):
     return {"uploads": uploads, "skipped": skipped + not_embeddable}, batches, len(new_videos)
 
 
-def sync_dir(data_dir, files):
-    """Makes data_dir contain exactly `files` ({relative path: bytes}), only touching files that differ."""
-    for rel, data in files.items():
-        path = data_dir / rel
-        if path.exists() and path.read_bytes() == data:
-            continue
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
-    wanted = {data_dir / rel for rel in files}
-    for path in sorted(data_dir.rglob("*"), reverse=True):
-        if path.is_file() and path not in wanted:
-            path.unlink()
-        elif path.is_dir() and not any(path.iterdir()):
-            path.rmdir()
-
-
 def main():
-    if len(sys.argv) != 2:
-        fail("usage: build_data.py DATA_DIR")
-    data_dir = Path(sys.argv[1])
-    key = os.environ.get("YOUTUBE_API_KEY") or fail("the YOUTUBE_API_KEY environment variable is not set")
+    parser = argparse.ArgumentParser(description="Build the video data directory for the channels in channels.json.")
+    parser.add_argument("out_dir", type=Path, help="directory to write; must be empty or not exist")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--previous", metavar="URL", help="base URL of the previously published data")
+    source.add_argument("--fresh", action="store_true", help="ignore previous data and backfill every channel")
+    args = parser.parse_args()
 
-    existing = {}
-    if data_dir.exists() and any(data_dir.iterdir()):
-        # Guard against pointing this at some other directory, since it deletes files it doesn't recognize.
-        index = read_json(data_dir / "index.json")
-        if index.get("version") != FORMAT_VERSION:
-            fail(f"{data_dir / 'index.json'} is format version {index.get('version')}, expected {FORMAT_VERSION}")
-        existing = index["channels"]
+    key = os.environ.get("YOUTUBE_API_KEY") or fail("the YOUTUBE_API_KEY environment variable is not set")
+    if args.out_dir.exists() and any(args.out_dir.iterdir()):
+        fail(f"output directory {args.out_dir} is not empty")
+
+    previous_base = None
+    previous_channels = {}
+    previous_index_raw = None
+    if args.previous:
+        previous_base = args.previous if args.previous.endswith("/") else args.previous + "/"
+        previous_index, previous_index_raw = load_previous_index(previous_base)
+        previous_channels = previous_index["channels"]
 
     channels = json.loads((Path(__file__).parent / "channels.json").read_text(encoding="utf-8"))
     handles = [ch["handle"].lower() for ch in channels]
@@ -232,7 +252,7 @@ def main():
         handle = ch["handle"]
         # Printed first so an error while updating the channel shows which channel it was.
         print(f"{handle}: ", end="", flush=True)
-        manifest, batches, added = update_channel(key, data_dir, handle, existing.get(handle))
+        manifest, batches, added = update_channel(key, previous_base, handle, previous_channels.get(handle))
 
         names = []
         for i, batch in enumerate(batches):
@@ -248,8 +268,21 @@ def main():
         index[handle] = {"name": ch["name"], "manifest": manifest_path, "count": count}
         print(f"{count} videos ({added} new) in {len(batches)} batches", flush=True)
 
-    files["index.json"] = (json.dumps({"version": FORMAT_VERSION, "channels": index}, ensure_ascii=False, indent=1) + "\n").encode()
-    sync_dir(data_dir, files)
+    index_raw = (json.dumps({"version": FORMAT_VERSION, "channels": index}, ensure_ascii=False, indent=1) + "\n").encode()
+    files["index.json"] = index_raw
+    for rel, data in files.items():
+        path = args.out_dir / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    # index.json names every other file by its content hash, so it's unchanged
+    # exactly when nothing is.
+    changed = index_raw != previous_index_raw
+    print("Changed from the previous data." if changed else "Unchanged from the previous data.")
+    github_output = os.environ.get("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a", encoding="utf-8") as f:
+            f.write(f"changed={'true' if changed else 'false'}\n")
 
 
 if __name__ == "__main__":
