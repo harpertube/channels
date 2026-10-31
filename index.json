@@ -1,0 +1,65 @@
+{
+ "version": 1,
+ "channels": {
+  "@SuperSimpleSongs": {
+   "name": "Super Simple Songs",
+   "manifest": "SuperSimpleSongs/manifest.0910d79fd3ed.json",
+   "count": 905
+  },
+  "@KidsTV123": {
+   "name": "KidsTV123",
+   "manifest": "KidsTV123/manifest.62427a7bb300.json",
+   "count": 393
+  },
+  "@Numberblocks": {
+   "name": "Numberblocks",
+   "manifest": "Numberblocks/manifest.781d07083155.json",
+   "count": 2825
+  },
+  "@BriReads": {
+   "name": "Bri Reads",
+   "manifest": "BriReads/manifest.72d13112857d.json",
+   "count": 342
+  },
+  "@HeyBear": {
+   "name": "Hey Bear Sensory",
+   "manifest": "HeyBear/manifest.2f95806c2c88.json",
+   "count": 95
+  },
+  "@BouncePatrol": {
+   "name": "Bounce Patrol - Kids Songs",
+   "manifest": "BouncePatrol/manifest.10f9e755a925.json",
+   "count": 330
+  },
+  "@SesameStreet": {
+   "name": "Sesame Street",
+   "manifest": "SesameStreet/manifest.8d3fb812d3c2.json",
+   "count": 4148
+  },
+  "@KidsCamp": {
+   "name": "KidsCamp Nursery Rhymes & Learning Videos for Kids",
+   "manifest": "KidsCamp/manifest.4f819177317c.json",
+   "count": 1400
+  },
+  "@TobeeAndFriends": {
+   "name": "Tobee & Friends",
+   "manifest": "TobeeAndFriends/manifest.8ef758231fb2.json",
+   "count": 115
+  },
+  "@SuperSimplePlay": {
+   "name": "Super Simple Play with Caitie!",
+   "manifest": "SuperSimplePlay/manifest.ace682363eb5.json",
+   "count": 708
+  },
+  "@BabyEinstein": {
+   "name": "Baby Einstein",
+   "manifest": "BabyEinstein/manifest.e4787530dd02.json",
+   "count": 887
+  },
+  "@MsRachel": {
+   "name": "Ms Rachel - Toddler Learning Videos",
+   "manifest": "MsRachel/manifest.673039cee5a3.json",
+   "count": 125
+  }
+ }
+}
