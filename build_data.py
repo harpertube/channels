@@ -34,7 +34,9 @@ When run in GitHub Actions, it sets the step output "changed" to "true" or
 "false", depending on whether the result differs from the previous data.
 """
 import argparse
+import collections
 import hashlib
+import html
 import json
 import os
 import re
@@ -59,6 +61,18 @@ def fail(message):
     sys.exit(f"error: {message}")
 
 
+def describe_http_error(e):
+    """Describes an HTTPError with what the server said about it, not just the status code."""
+    body = e.read().decode(errors="replace")
+    if "html" in (e.headers.get("Content-Type") or ""):
+        body = re.sub(r"(?s)<(style|script)[^>]*>.*?</\1>", "", body)
+        body = html.unescape(re.sub(r"<[^>]+>", " ", body))
+    body = re.sub(r"\s+", " ", body).strip()
+    if len(body) > 300:
+        body = body[:300] + "..."
+    return f'HTTP {e.code} from "{e.headers.get("Server", "unknown server")}": {body or "(empty body)"}'
+
+
 def yt_api(key, endpoint, **params):
     url = API + endpoint + "?" + urllib.parse.urlencode({**params, "key": key})
     try:
@@ -76,8 +90,10 @@ def fetch_rss_ids(uploads):
     """
     # An uploads playlist ID is the channel ID with "UC" replaced by "UU".
     url = "https://www.youtube.com/feeds/videos.xml?channel_id=UC" + uploads.removeprefix("UU")
-    # YouTube's feed server randomly answers many requests with a 404 or 500: about
-    # 1 in 5 from a home connection, and far more often from GitHub's runners.
+    # YouTube's feed server often answers valid channels with its generic "404.
+    # That's an error." page or a 500, giving no reason: about 1 in 5 requests
+    # from a home connection early on 2026-10-31, and most requests a few hours
+    # later, from GitHub's runners and home alike.
     errors = []
     for attempt in range(RSS_ATTEMPTS):
         if attempt:
@@ -87,13 +103,16 @@ def fetch_rss_ids(uploads):
                 root = ElementTree.parse(res).getroot()
             return [el.text for el in root.iter("{http://www.youtube.com/xml/schemas/2015}videoId")]
         except urllib.error.HTTPError as e:
-            errors.append(f"HTTP {e.code}")
+            errors.append(describe_http_error(e))
         except urllib.error.URLError as e:
             errors.append(str(e.reason))
     # The feed is only a quota-saving shortcut; the caller asks the API instead,
     # which gives the same answer for 1 unit. Logged so a feed that's broken for
-    # good gets noticed.
-    print(f"(RSS feed failed {RSS_ATTEMPTS} times: {', '.join(errors)}; checking with the API) ", end="", flush=True)
+    # good gets noticed. Goes to stderr so it stays out of the data branch's
+    # commit messages, which are built from stdout.
+    print(f"\nRSS feed {url} failed {RSS_ATTEMPTS} times; checking with the API instead:", file=sys.stderr)
+    for error, count in collections.Counter(errors).items():
+        print(f"  {count}x {error}", file=sys.stderr)
     return None
 
 
@@ -122,7 +141,7 @@ def download(url):
         with urllib.request.urlopen(url, timeout=60) as res:
             return res.read()
     except urllib.error.HTTPError as e:
-        fail(f"downloading {url} failed: HTTP {e.code}")
+        fail(f"downloading {url} failed: {describe_http_error(e)}")
     except urllib.error.URLError as e:
         fail(f"downloading {url} failed: {e.reason}")
 
@@ -135,9 +154,9 @@ def load_previous_index(base_url):
             raw = res.read()
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            fail(f"no previous data at {url}. If nothing has been published yet, use --fresh "
-                 "(in GitHub, run the workflow by hand with 'fresh' checked).")
-        fail(f"downloading {url} failed: HTTP {e.code}")
+            fail(f"no previous data at {url} ({describe_http_error(e)}). If nothing has been published yet, "
+                 "use --fresh (in GitHub, run the workflow by hand with 'fresh' checked).")
+        fail(f"downloading {url} failed: {describe_http_error(e)}")
     except urllib.error.URLError as e:
         fail(f"downloading {url} failed: {e.reason}")
     index = json.loads(raw)
