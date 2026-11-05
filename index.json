@@ -3,8 +3,8 @@
  "channels": {
   "@SuperSimpleSongs": {
    "name": "Super Simple Songs",
-   "manifest": "SuperSimpleSongs/manifest.8e96d37f229b.json",
-   "count": 780
+   "manifest": "SuperSimpleSongs/manifest.11aeea21f8d6.json",
+   "count": 781
   },
   "@KidsTV123": {
    "name": "KidsTV123",
@@ -13,8 +13,8 @@
   },
   "@Numberblocks": {
    "name": "Numberblocks",
-   "manifest": "Numberblocks/manifest.a649cdd3a990.json",
-   "count": 2423
+   "manifest": "Numberblocks/manifest.03d40084a881.json",
+   "count": 2424
   },
   "@BriReads": {
    "name": "Bri Reads",
@@ -38,8 +38,8 @@
   },
   "@KidsCamp": {
    "name": "KidsCamp Nursery Rhymes & Learning Videos for Kids",
-   "manifest": "KidsCamp/manifest.64358ad19333.json",
-   "count": 818
+   "manifest": "KidsCamp/manifest.e12812a01576.json",
+   "count": 819
   },
   "@TobeeAndFriends": {
    "name": "Tobee & Friends",
