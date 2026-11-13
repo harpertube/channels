@@ -13,8 +13,8 @@
   },
   "@Numberblocks": {
    "name": "Numberblocks",
-   "manifest": "Numberblocks/manifest.445264964cf3.json",
-   "count": 2429
+   "manifest": "Numberblocks/manifest.488c33cce02d.json",
+   "count": 2430
   },
   "@BriReads": {
    "name": "Bri Reads",
@@ -33,13 +33,13 @@
   },
   "@SesameStreet": {
    "name": "Sesame Street",
-   "manifest": "SesameStreet/manifest.97bdfaaffcd2.json",
-   "count": 3778
+   "manifest": "SesameStreet/manifest.d662a1668abe.json",
+   "count": 3779
   },
   "@KidsCamp": {
    "name": "KidsCamp Nursery Rhymes & Learning Videos for Kids",
-   "manifest": "KidsCamp/manifest.2f74a1ec7728.json",
-   "count": 821
+   "manifest": "KidsCamp/manifest.113208530485.json",
+   "count": 822
   },
   "@TobeeAndFriends": {
    "name": "Tobee & Friends",
