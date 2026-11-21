@@ -33,13 +33,13 @@
   },
   "@SesameStreet": {
    "name": "Sesame Street",
-   "manifest": "SesameStreet/manifest.cfc6aea25c04.json",
-   "count": 3781
+   "manifest": "SesameStreet/manifest.856f8b4017a0.json",
+   "count": 3782
   },
   "@KidsCamp": {
    "name": "KidsCamp Nursery Rhymes & Learning Videos for Kids",
-   "manifest": "KidsCamp/manifest.e0b9d3319c41.json",
-   "count": 823
+   "manifest": "KidsCamp/manifest.f280c7a8b3c8.json",
+   "count": 824
   },
   "@TobeeAndFriends": {
    "name": "Tobee & Friends",
