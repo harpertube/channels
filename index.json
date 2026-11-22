@@ -13,8 +13,8 @@
   },
   "@Numberblocks": {
    "name": "Numberblocks",
-   "manifest": "Numberblocks/manifest.6c95c653a6d1.json",
-   "count": 2435
+   "manifest": "Numberblocks/manifest.30c03c819e35.json",
+   "count": 2436
   },
   "@BriReads": {
    "name": "Bri Reads",
@@ -33,13 +33,13 @@
   },
   "@SesameStreet": {
    "name": "Sesame Street",
-   "manifest": "SesameStreet/manifest.856f8b4017a0.json",
-   "count": 3782
+   "manifest": "SesameStreet/manifest.8046526e4c83.json",
+   "count": 3783
   },
   "@KidsCamp": {
    "name": "KidsCamp Nursery Rhymes & Learning Videos for Kids",
-   "manifest": "KidsCamp/manifest.f280c7a8b3c8.json",
-   "count": 824
+   "manifest": "KidsCamp/manifest.76e7bd7ed99d.json",
+   "count": 825
   },
   "@TobeeAndFriends": {
    "name": "Tobee & Friends",
@@ -48,8 +48,8 @@
   },
   "@SuperSimplePlay": {
    "name": "Super Simple Play with Caitie!",
-   "manifest": "SuperSimplePlay/manifest.95722cc7f10a.json",
-   "count": 502
+   "manifest": "SuperSimplePlay/manifest.eb49e4dac2cd.json",
+   "count": 503
   },
   "@BabyEinstein": {
    "name": "Baby Einstein",
