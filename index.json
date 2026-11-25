@@ -33,8 +33,8 @@
   },
   "@SesameStreet": {
    "name": "Sesame Street",
-   "manifest": "SesameStreet/manifest.7810b9dfa7d2.json",
-   "count": 3784
+   "manifest": "SesameStreet/manifest.2b3926f242c0.json",
+   "count": 3786
   },
   "@KidsCamp": {
    "name": "KidsCamp Nursery Rhymes & Learning Videos for Kids",
@@ -53,8 +53,8 @@
   },
   "@BabyEinstein": {
    "name": "Baby Einstein",
-   "manifest": "BabyEinstein/manifest.c3e9c3731bac.json",
-   "count": 700
+   "manifest": "BabyEinstein/manifest.1a0c2ad4ee36.json",
+   "count": 701
   },
   "@MsRachel": {
    "name": "Ms Rachel - Toddler Learning Videos",
